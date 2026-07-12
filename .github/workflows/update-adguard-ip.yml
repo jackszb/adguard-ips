@@ -1,0 +1,44 @@
+name: Update AdGuard IP list
+
+on:
+  schedule:
+    # 每天 UTC 00:00 运行（北京时间 08:00）
+    - cron: "0 0 * * *"
+  workflow_dispatch: {}   # 支持手动触发
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-adguard-ip
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Extract IPs and generate adguard-ip.json
+        run: python scripts/extract_ip.py
+
+      - name: Commit and push if changed
+        run: |
+          if git diff --quiet -- adguard-ip.json; then
+            echo "No changes detected, skip commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add adguard-ip.json
+          git commit -m "chore: update adguard-ip.json ($(date -u +'%Y-%m-%d'))"
+          git push
